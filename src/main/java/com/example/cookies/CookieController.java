@@ -13,27 +13,27 @@ import org.springframework.web.bind.annotation.RequestParam;
 @Controller
 public class CookieController {
 
-    // Mostrar formulario de login
     @GetMapping("/")
     public String loginForm() {
         return "login";
     }
 
-    // Procesar login y crear cookie
     @PostMapping("/login")
     public String login(
             @RequestParam String usuario,
             HttpServletResponse response) {
 
-        Cookie cookie = new Cookie("usuario", usuario);
-        cookie.setMaxAge(-1); // cookie de sesión
+        String token = JwtUtil.generarToken(usuario);
+
+        Cookie cookie = new Cookie("jwt", token);
+        cookie.setHttpOnly(true);
         cookie.setPath("/");
+        cookie.setMaxAge(60 * 30);
         response.addCookie(cookie);
 
         return "redirect:/perfil";
     }
 
-    // Mostrar perfil leyendo la cookie
     @GetMapping("/perfil")
     public String perfil(HttpServletRequest request, Model model) {
 
@@ -41,9 +41,14 @@ public class CookieController {
 
         if (cookies != null) {
             for (Cookie c : cookies) {
-                if (c.getName().equals("usuario")) {
-                    model.addAttribute("usuario", c.getValue());
-                    return "perfil";
+                if (c.getName().equals("jwt")) {
+                    try {
+                        String usuario = JwtUtil.obtenerUsuario(c.getValue());
+                        model.addAttribute("usuario", usuario);
+                        return "perfil";
+                    } catch (Exception e) {
+                        return "redirect:/";
+                    }
                 }
             }
         }
@@ -51,10 +56,9 @@ public class CookieController {
         return "redirect:/";
     }
 
-    // Logout (eliminar cookie)
     @GetMapping("/logout")
     public String logout(HttpServletResponse response) {
-        Cookie cookie = new Cookie("usuario", "");
+        Cookie cookie = new Cookie("jwt", "");
         cookie.setMaxAge(0);
         cookie.setPath("/");
         response.addCookie(cookie);
